@@ -3,7 +3,7 @@ import React, { useReducer, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Sparkles, Plus, Trash2, Edit2, Wand2, Play, 
-  User, Globe, Settings, Users, Upload, Download, Eye
+  User, Globe, Settings, Users, Upload, Download, Eye, PlayCircle
 } from 'lucide-react';
 import { NavigationProps, GameState, WorldData, NarrativePerspective } from '../../../types';
 import Button from '../../ui/Button';
@@ -19,6 +19,7 @@ const TABS = [
   { id: 1, label: "Thế giới", icon: Globe },
   { id: 2, label: "Cấu hình", icon: Settings },
   { id: 3, label: "Thực thể", icon: Users },
+  { id: 4, label: "Khởi đầu", icon: PlayCircle },
 ];
 
 interface WorldCreationProps extends NavigationProps {
@@ -56,7 +57,7 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
     }
   }, [initialData]);
 
-  // --- AI Helper Function (UPDATED WITH VALIDATION & ENRICHMENT) ---
+  // --- AI Helper Function ---
   const handleAiGenerate = async (field: string, category: 'player' | 'world') => {
     // 1. Validation Logic
     if (category === 'player') {
@@ -74,27 +75,24 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
 
     dispatch({ type: 'SET_GENERATING', isGenerating: true, field });
     try {
-      // 2. Build Explicit Context
       const contextData = category === 'player' 
         ? { ...state.player, genre: state.world.genre } 
         : { genre: state.world.genre, worldName: state.world.worldName };
 
-      // 3. Get Current Value for Enrichment
       let currentValue = "";
       if (category === 'player') {
-          // @ts-ignore - Dynamic access
+          // @ts-ignore
           currentValue = state.player[field] || "";
       } else {
-          // @ts-ignore - Dynamic access
+          // @ts-ignore
           currentValue = state.world[field] || "";
       }
 
       const content = await worldAiService.generateFieldContent(category, field, contextData, aiModel, currentValue);
       
-      // Dispatch based on field type
       if (['name', 'gender', 'age', 'personality', 'background', 'appearance', 'skills', 'goal'].includes(field)) {
         dispatch({ type: 'UPDATE_PLAYER', field: field as any, value: content });
-      } else if (['worldName', 'context'].includes(field)) {
+      } else if (['worldName', 'context', 'startingScenario'].includes(field)) {
         dispatch({ type: 'UPDATE_WORLD', field: field as any, value: content });
       }
     } catch (error) {
@@ -125,9 +123,7 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
         entities: state.entities
     };
     
-    // Create fileName based on world name or default
     const fileName = `aetheria_${state.world.worldName.replace(/\s+/g, '_').toLowerCase() || 'untitled'}_setup.json`;
-    
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
@@ -151,7 +147,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
         const content = e.target?.result as string;
         const parsedData = JSON.parse(content) as WorldData;
         
-        // Basic Validation
         if (!parsedData.player || !parsedData.world || !parsedData.config) {
             throw new Error("Cấu trúc file không hợp lệ");
         }
@@ -176,7 +171,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
         entities: state.entities
      };
      
-     // Validate basic fields
      if (!worldData.player.name || !worldData.world.worldName) {
          showNotify("Vui lòng hoàn thiện ít nhất Tên Nhân Vật và Tên Thế Giới!", 'warning');
          return;
@@ -277,7 +271,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
   );
 
   const renderWorldTab = () => {
-    // Check if the current genre is in the predefined list or is a custom one
     const isCustomGenre = !GENRE_OPTIONS.filter(o => o !== 'Tùy chọn').includes(state.world.genre) && state.world.genre !== '';
     const selectValue = isCustomGenre ? 'Tùy chọn' : state.world.genre;
 
@@ -301,7 +294,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val === 'Tùy chọn') {
-                          // Keep current if it's already custom, or clear it if switching from a preset
                           if (!isCustomGenre) dispatch({ type: 'UPDATE_WORLD', field: 'genre', value: '' });
                         } else {
                           dispatch({ type: 'UPDATE_WORLD', field: 'genre', value: val });
@@ -312,7 +304,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
                       {GENRE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                   
-                  {/* Show Input ONLY if "Tùy chọn" is selected (or we have a custom value) */}
                   {(selectValue === 'Tùy chọn') && (
                     <MotionInput 
                         initial={{ opacity: 0, height: 0 }}
@@ -494,9 +485,32 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
     </div>
   );
 
+  const renderStartScenarioTab = () => (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
+       <h3 className="text-xl font-serif font-bold text-slate-200 border-b border-slate-700 pb-1 mb-2 flex items-center gap-2">
+          <PlayCircle size={20} className="text-mystic-accent" /> Kịch Bản Khởi Đầu
+       </h3>
+       <div className="bg-mystic-800/30 p-4 rounded-lg border border-slate-700 mb-2">
+          <p className="text-sm text-slate-400 leading-relaxed italic">
+            Nhập hành động khởi đầu của bạn. AI sẽ dựa vào đây để dẫn dắt lượt đầu tiên của câu chuyện. Nếu bỏ trống, AI sẽ tự động tạo một đoạn mở đầu ngẫu nhiên phù hợp với bối cảnh thế giới.
+          </p>
+       </div>
+       <div className="flex-1">
+          <TextAreaGroup 
+            label="Hành động đầu tiên của bạn" 
+            value={state.world.startingScenario || ''} 
+            onChange={(v) => dispatch({ type: 'UPDATE_WORLD', field: 'startingScenario', value: v })} 
+            height="h-full"
+            placeholder="Ví dụ: Tôi đang ngồi trong một quán rượu sầm uất, tay cầm ly rượu mạnh và quan sát những người khách lạ xung quanh..."
+            onAi={() => handleAiGenerate('startingScenario', 'world')}
+            loading={state.isGenerating && state.generatingField === 'startingScenario'}
+          />
+       </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-full w-full max-w-6xl mx-auto relative overflow-hidden">
-      {/* Hidden File Input for Import */}
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -505,7 +519,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
         className="hidden" 
       />
 
-      {/* HEADER AREA - Sticky at top */}
       <div className="shrink-0 p-4 md:p-6 pb-2">
           <div className="flex items-center justify-between mb-4">
             <button onClick={() => onNavigate(GameState.MENU)} className="text-slate-400 hover:text-white flex items-center gap-2">
@@ -515,7 +528,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
             <div className="w-20" />
           </div>
 
-          {/* AUTO-FILL BAR */}
           <div className="mb-6 bg-mystic-800/40 p-3 rounded-lg border border-mystic-accent/20 flex gap-3 items-center">
              <Wand2 className="text-mystic-accent shrink-0" size={20} />
              <input 
@@ -534,7 +546,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
              </Button>
           </div>
 
-          {/* TABS HEADER */}
           <div className="flex border-b border-slate-700 overflow-x-auto no-scrollbar md:justify-start">
              {TABS.map((tab) => (
                  <button
@@ -554,20 +565,18 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
           </div>
       </div>
 
-      {/* TAB CONTENT - SCROLLABLE AREA */}
       <div className="flex-1 overflow-y-auto custom-scrollbar relative px-4 md:px-6 pb-4">
          <AnimatePresence mode="wait">
             {state.currentTab === 0 && <MotionDiv key="tab0" className="h-full">{renderPlayerTab()}</MotionDiv>}
             {state.currentTab === 1 && <MotionDiv key="tab1" className="h-full">{renderWorldTab()}</MotionDiv>}
             {state.currentTab === 2 && <MotionDiv key="tab2" className="h-full">{renderConfigTab()}</MotionDiv>}
             {state.currentTab === 3 && <MotionDiv key="tab3" className="h-full">{renderEntitiesTab()}</MotionDiv>}
+            {state.currentTab === 4 && <MotionDiv key="tab4" className="h-full">{renderStartScenarioTab()}</MotionDiv>}
          </AnimatePresence>
       </div>
 
-      {/* FOOTER ACTION BAR - Sticky at bottom */}
       <div className="shrink-0 z-20 bg-mystic-900/95 backdrop-blur-md border-t border-slate-800 p-4 shadow-[0_-5px_15px_rgba(0,0,0,0.3)]">
          <div className="grid grid-cols-2 md:flex md:flex-row gap-3 md:gap-4 justify-between items-center max-w-6xl mx-auto">
-             {/* Mobile: Row 1, Desktop: Left align */}
              <div className="col-span-1 md:w-auto">
                  <Button 
                     variant="ghost" 
@@ -579,7 +588,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
                  </Button>
              </div>
              
-             {/* Mobile: Row 1, Desktop: Left align */}
              <div className="col-span-1 md:w-auto">
                  <Button 
                     variant="ghost" 
@@ -591,13 +599,12 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
                  </Button>
              </div>
 
-             {/* Mobile: Row 2 (Full width), Desktop: Right align */}
              <div className="col-span-2 md:flex-1 md:flex md:justify-end">
                   <Button 
                     variant="primary" 
                     className="w-full md:w-auto shadow-[0_0_20px_rgba(56,189,248,0.4)] px-8"
                     icon={<Play size={20} />}
-                    disabled={state.entities.length < 1} // Soft lock
+                    disabled={state.entities.length < 1} 
                     onClick={handleStartGame}
                   >
                     BẮT ĐẦU GAME
@@ -606,7 +613,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
          </div>
       </div>
 
-      {/* MODALS */}
       {showEntityForm && (
         <EntityForm 
             initialData={editingEntityId ? state.entities.find(e => e.id === editingEntityId) : undefined}
@@ -632,7 +638,6 @@ const WorldCreationScreen: React.FC<WorldCreationProps> = ({ onNavigate, onGameS
   );
 };
 
-// --- HELPER SUB-COMPONENTS ---
 const InputGroup = ({ label, value, onChange, placeholder }: { label: string, value: string, onChange: (v: string) => void, placeholder?: string }) => (
     <div>
         <label className="block text-sm font-medium text-mystic-accent mb-1">{label}</label>
@@ -646,14 +651,13 @@ const InputGroup = ({ label, value, onChange, placeholder }: { label: string, va
     </div>
 );
 
-// Updated TextAreaGroup with explicit AI button styling
 const TextAreaGroup = ({ label, value, onChange, onAi, height = 'h-24', loading = false, placeholder }: { label: string, value: string, onChange: (v: string) => void, onAi?: () => void, height?: string, loading?: boolean, placeholder?: string }) => (
-    <div className="relative flex flex-col">
-        <div className="flex justify-between items-center mb-1">
+    <div className="relative flex flex-col h-full">
+        <div className="flex justify-between items-center mb-1 shrink-0">
             <label className="text-sm font-medium text-mystic-accent">{label}</label>
             {onAi && (
                 <button 
-                    type="button" // Explicitly type button to prevent form submission issues
+                    type="button" 
                     onClick={(e) => {
                         e.stopPropagation();
                         onAi();
@@ -670,7 +674,7 @@ const TextAreaGroup = ({ label, value, onChange, onAi, height = 'h-24', loading 
         <textarea 
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className={`w-full ${height} min-h-[80px] resize-y bg-slate-800 border border-slate-600 rounded p-2 text-slate-100 outline-none focus:border-mystic-accent transition-colors text-sm placeholder-slate-500`}
+            className={`w-full ${height} resize-none bg-slate-800 border border-slate-600 rounded p-2 text-slate-100 outline-none focus:border-mystic-accent transition-colors text-sm placeholder-slate-500 flex-1`}
             placeholder={placeholder}
         />
     </div>

@@ -33,7 +33,8 @@ export const initialWorldState: WorldCreationState = {
   world: {
     worldName: '',
     genre: 'Tiên hiệp',
-    context: ''
+    context: '',
+    startingScenario: ''
   },
   config: {
     difficulty: DIFFICULTY_LEVELS[1], // Normal

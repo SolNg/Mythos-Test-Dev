@@ -80,11 +80,11 @@ const TawaMessageRenderer: React.FC<TawaMessageRendererProps> = ({ text, onUpdat
             formatted = formatted.replace(TAWA_REGEX.ASTERISK_REMOVAL, '');
         }
 
-        // 2. Handle Newlines for raw text
-        const hasHtmlTags = /<[a-z][\s\S]*>/i.test(formatted);
-        if (!hasHtmlTags) {
-            formatted = formatted.replace(/\n/g, '<br/>');
-        }
+        // 2. Handle Newlines for raw text -> REMOVED per user request to rely on CSS whitespace-pre-wrap
+        // const hasHtmlTags = /<[a-z][\s\S]*>/i.test(formatted);
+        // if (!hasHtmlTags) {
+        //    formatted = formatted.replace(/\n/g, '<br/>');
+        // }
 
         // 3. Highlight Dialogue (Quotes "..." or “...”)
         formatted = formatted.replace(
@@ -182,7 +182,7 @@ const TawaMessageRenderer: React.FC<TawaMessageRendererProps> = ({ text, onUpdat
             )}
             
             <div 
-              className="font-sans text-base md:text-lg text-slate-300 [&>p]:mb-3 last:[&>p]:mb-0 leading-relaxed"
+              className="font-sans text-base md:text-lg text-slate-300 leading-relaxed whitespace-pre-wrap"
               dangerouslySetInnerHTML={{ __html: formatContentWithHighlights(mainContent || "") }} 
             />
         </div>
@@ -194,7 +194,6 @@ const RulesManager: React.FC<{
     rules: string[];
     onUpdate: (newRules: string[]) => void;
 }> = ({ rules, onUpdate }) => {
-    // ... (No changes to RulesManager)
     const [isOpen, setIsOpen] = useState(false);
     const [newRule, setNewRule] = useState("");
     const [editIdx, setEditIdx] = useState<number | null>(null);
@@ -246,7 +245,6 @@ const RulesManager: React.FC<{
                             exit={{ opacity: 0, scale: 0.95 }}
                             className="bg-mystic-900 border border-slate-700 w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
                         >
-                            {/* Modal Header */}
                             <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 shrink-0">
                                 <h2 className="text-lg font-bold text-red-400 flex items-center gap-2">
                                     <BookOpen size={20}/> Luật Bất Khả Kháng
@@ -256,7 +254,6 @@ const RulesManager: React.FC<{
                                 </button>
                             </div>
 
-                            {/* Modal Body */}
                             <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
                                 <p className="text-xs text-slate-500 mb-4 italic border-l-2 border-red-900/50 pl-2">
                                     Các quy tắc này có quyền lực tối thượng, ép buộc AI phải tuân theo bất kể ngữ cảnh hay logic thông thường.
@@ -291,7 +288,6 @@ const RulesManager: React.FC<{
                                     ))}
                                 </div>
 
-                                {/* Add New Rule Input */}
                                 <div className="flex gap-2 pt-2 border-t border-slate-800">
                                     <input 
                                         value={newRule}
@@ -326,46 +322,36 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // UI States
   const [showActionChoices, setShowActionChoices] = useState(true);
   const [showCharModal, setShowCharModal] = useState(false);
   const [showGlobalModal, setShowGlobalModal] = useState(false);
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Dynamic States (Rules & Tawa)
   const [tawaPresetConfig, setTawaPresetConfig] = useState<TawaPresetConfig>(DEFAULT_PRESET_CONFIG);
   const [dynamicRules, setDynamicRules] = useState<string[]>([]);
 
-  // LSR State
   const [lsrTables, setLsrTables] = useState<LsrTableDefinition[]>([]);
   const [lsrRuntimeData, setLsrRuntimeData] = useState<Record<string, any[]>>({});
 
-  // Notification State
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
 
-  // Refs for auto-scrolling
   const chatEndRef = useRef<HTMLDivElement>(null);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
 
-  // Helper to show notification
   const showNotify = (message: string, type: NotificationType = 'info') => {
       setNotification({ show: true, message, type });
   };
 
-  // --- Initial Load ---
   useEffect(() => {
     const init = async () => {
       const s = await dbService.getSettings();
       setSettings(s);
 
-      // Load LSR Definitions
       setLsrTables(LsrParser.parseDefinitions());
 
       if (activeWorld) {
-          // Sync initial rules from world config
           setDynamicRules(activeWorld.config.rules || []);
 
           const worldDataWithState = activeWorld as WorldData;
@@ -373,31 +359,29 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
               setHistory(worldDataWithState.savedState.history);
               setTurnCount(worldDataWithState.savedState.turnCount);
               
-              // Task 3.4: Background vectorization of existing history
-              // Run efficiently in background without blocking UI
               setTimeout(() => {
                   vectorService.vectorizeAllHistory(worldDataWithState.savedState!.history);
               }, 1000);
 
           } else if (history.length === 0 && s) {
-            // Initial Start: Generate opening
-            handleSendInitial(s);
+            // New Game Start: Check for Starting Scenario
+            const initialAction = activeWorld.world.startingScenario || "Hãy bắt đầu câu chuyện.";
+            handleSendInitial(s, initialAction);
           }
       }
     };
     init();
   }, []);
 
-  const handleSendInitial = async (currentSettings: AppSettings) => {
+  const handleSendInitial = async (currentSettings: AppSettings, initialInput: string) => {
      setIsLoading(true);
-     // Enable auto scroll for initial load
      shouldAutoScrollRef.current = true;
      
      if (currentSettings.streamResponse) {
-         await runStreamGeneration("Hãy bắt đầu câu chuyện.", [], currentSettings);
+         await runStreamGeneration(initialInput, [], currentSettings);
      } else {
          const opening = await gameplayAiService.generateStoryTurn(
-              "Hãy bắt đầu câu chuyện.", 
+              initialInput, 
               [], 
               activeWorld!, 
               currentSettings,
@@ -408,12 +392,9 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
      setTurnCount(1);
   };
 
-  // --- LSR Data & History Sync Logic ---
   useEffect(() => {
       if (history.length > 0) {
           const lastMsg = history[history.length - 1];
-          // Check if last message is from model and contains table data
-          // We check the 'text' (current swipe)
           const currentText = (lastMsg.swipes && lastMsg.swipes.length > 0 && lastMsg.swipeIndex !== undefined) 
                             ? lastMsg.swipes[lastMsg.swipeIndex] 
                             : lastMsg.text;
@@ -421,9 +402,7 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
           if (lastMsg.role === 'model') {
               const tableContent = extractTagContent(currentText, 'table_stored');
               if (tableContent) {
-                  // Parse Text-based LSR data
                   const parsedData = LsrParser.parseLsrString(tableContent);
-                  // Update runtime state
                   setLsrRuntimeData(parsedData);
                   console.log("Updated LSR Sidebar Data:", parsedData);
               }
@@ -431,20 +410,16 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
       }
   }, [history]);
 
-  // --- Auto-Scroll & Pagination Logic ---
   useEffect(() => {
     const totalPages = Math.ceil(history.length / MESSAGES_PER_PAGE) || 1;
-    // Auto switch to last page when new message arrives
     if (history.length > 0) {
         setCurrentPage(totalPages);
     }
   }, [history.length]);
 
-  // Scroll handler to detect if user is at the bottom
   const handleScroll = () => {
     if (scrollViewportRef.current) {
         const { scrollTop, scrollHeight, clientHeight } = scrollViewportRef.current;
-        // Check if user is near bottom (e.g. 50px tolerance)
         const isAtBottom = scrollHeight - (scrollTop + clientHeight) < 50;
         shouldAutoScrollRef.current = isAtBottom;
     }
@@ -456,7 +431,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
       }
   }, [history, isLoading]);
   
-  // Force scroll when page changes (navigating history)
   useEffect(() => {
       if (chatEndRef.current) {
           chatEndRef.current.scrollIntoView({ behavior: 'auto' });
@@ -465,7 +439,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
   }, [currentPage]);
 
 
-  // --- Handlers ---
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading || !activeWorld || !settings) return;
 
@@ -474,7 +447,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
     setHistory(newHistory);
     setInputValue('');
     
-    // Force auto-scroll on send
     shouldAutoScrollRef.current = true;
     
     if (settings.streamResponse) {
@@ -503,13 +475,10 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
   const handleRegenerate = async (msgIndex: number) => {
       if (isLoading || !activeWorld || !settings) return;
       
-      // Determine context: history up to msgIndex - 1 (the user message triggering this)
-      // msgIndex is the Model message index. history[msgIndex - 1] is the User message.
       const prevHistory = history.slice(0, msgIndex);
       const userTriggerMsg = history[msgIndex - 1];
       const userInput = userTriggerMsg?.text || "Continue";
 
-      // Force auto-scroll on regenerate
       shouldAutoScrollRef.current = true;
 
       if (settings.streamResponse) {
@@ -541,7 +510,7 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
       userInput: string, 
       currentHistory: ChatMessage[], 
       currentSettings: AppSettings,
-      regenerateIndex?: number // If provided, we are regenerating an existing message
+      regenerateIndex?: number 
   ) => {
       setIsLoading(true);
       const effectiveWorldData: WorldData = {
@@ -554,7 +523,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
 
       let targetIndex = regenerateIndex;
 
-      // If NOT regenerating, create a placeholder message first
       if (targetIndex === undefined) {
           const placeholderMsg: ChatMessage = {
               role: 'model',
@@ -564,27 +532,24 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
               swipeIndex: 0,
               choices: []
           };
-          // We need to set history with placeholder
           setHistory(prev => {
               const updated = [...prev, placeholderMsg];
               targetIndex = updated.length - 1; 
               return updated;
           });
       } else {
-          // If regenerating, prepare the new swipe slot
           setHistory(prev => {
               const updated = [...prev];
               const msg = { ...updated[targetIndex!] };
-              const newSwipes = [...(msg.swipes || [msg.text]), ""]; // Add empty slot
+              const newSwipes = [...(msg.swipes || [msg.text]), ""]; 
               msg.swipes = newSwipes;
               msg.swipeIndex = newSwipes.length - 1;
-              msg.text = ""; // Clear current text for streaming visual
+              msg.text = ""; 
               updated[targetIndex!] = msg;
               return updated;
           });
       }
 
-      // Small delay to ensure state update (optional but safe)
       await new Promise(r => setTimeout(r, 0));
 
       const stream = gameplayAiService.generateStoryTurnStream(
@@ -600,27 +565,24 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
       for await (const chunk of stream) {
           accumulatedText += chunk;
           
-          // Update the specific message in history
           setHistory(prev => {
               if (targetIndex === undefined || !prev[targetIndex]) return prev;
               
               const updated = [...prev];
               const msg = { ...updated[targetIndex] };
               
-              // Update the current swipe
               const swipes = [...(msg.swipes || [""])];
               const currentSwipeIdx = msg.swipeIndex || 0;
               swipes[currentSwipeIdx] = accumulatedText;
               
               msg.swipes = swipes;
-              msg.text = accumulatedText; // Always sync text for display/compatibility
+              msg.text = accumulatedText; 
               
               updated[targetIndex] = msg;
               return updated;
           });
       }
 
-      // Finalize parsing (Branches/Choices)
       setHistory(prev => {
            if (targetIndex === undefined || !prev[targetIndex]) return prev;
            const updated = [...prev];
@@ -678,7 +640,7 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
             msg.swipes = newSwipes;
             msg.swipeIndex = newSwipes.length - 1;
             msg.text = newText;
-            msg.choices = choicesList; // Update choices to latest generation
+            msg.choices = choicesList; 
 
             updated[index] = msg;
             return updated;
@@ -696,11 +658,9 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
     setHistory(prev => {
         const newHistory = [...prev];
         if (newHistory[index]) {
-            // Update raw text
             const msg = { ...newHistory[index] };
             msg.text = newText;
 
-            // Also update the specific swipe if it exists
             if (msg.swipes && msg.swipeIndex !== undefined) {
                 const newSwipes = [...msg.swipes];
                 newSwipes[msg.swipeIndex] = newText;
@@ -733,13 +693,9 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
           if (direction === 'prev') {
               if (currentIndex > 0) newIndex--;
           } else {
-              // Logic for Next
               if (currentIndex < msg.swipes.length - 1) {
                   newIndex++;
               } else {
-                  // Trigger Regenerate if at the end
-                  // We can't trigger async regenerate inside setState. 
-                  // So we handle it outside, but here we just return if we are at max.
                   return prev; 
               }
           }
@@ -747,7 +703,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
           msg.swipeIndex = newIndex;
           msg.text = msg.swipes[newIndex];
           
-          // Re-parse choices for this specific swipe version
           const branchesContent = extractTagContent(msg.text, 'branches');
           msg.choices = branchesContent 
               ? branchesContent.split('\n').map(c => c.trim()).filter(c => c.length > 0) 
@@ -757,7 +712,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
           return updated;
       });
       
-      // Handle Regenerate Trigger separately outside
       const msg = history[msgIndex];
       const currentIndex = msg.swipeIndex || 0;
       const total = msg.swipes ? msg.swipes.length : 1;
@@ -836,7 +790,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
       await dbService.saveSettings(updated);
   };
 
-  // --- RENDER CONTENT HELPER ---
   const renderSidebarContent = () => (
       <div className="h-full flex flex-col bg-mystic-900 shadow-xl">
           <div className="p-4 border-b border-slate-800 bg-mystic-800/50 shrink-0 space-y-2">
@@ -850,7 +803,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
               </button>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 space-y-4">
-              {/* Stream Toggle */}
               <button 
                   onClick={toggleStreamResponse}
                   className="w-full p-3 flex justify-between items-center text-left hover:bg-slate-700/50 transition-colors bg-slate-800/30 rounded-lg border border-slate-700"
@@ -874,7 +826,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
       </div>
   );
 
-  // --- RENDER ---
   if (!activeWorld) return null;
 
   const totalPages = Math.ceil(history.length / MESSAGES_PER_PAGE) || 1;
@@ -885,9 +836,7 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
 
   return (
     <div className="flex h-full w-full bg-mystic-900 font-sans overflow-hidden">
-        {/* LEFT COLUMN */}
         <div className="flex-1 flex flex-col h-full relative z-10 min-w-0">
-            {/* Header ... */}
             <header className="h-16 shrink-0 bg-mystic-900 border-b border-slate-800 flex items-center justify-center relative px-4 z-30 shadow-sm">
                  <button 
                     className="md:hidden absolute left-4 text-slate-400 hover:text-white"
@@ -907,7 +856,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
                  </div>
             </header>
 
-            {/* Chat Area */}
             <div 
                 ref={scrollViewportRef}
                 onScroll={handleScroll}
@@ -920,8 +868,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
                         const swipeIndex = msg.swipeIndex || 0;
                         const displayText = swipes[swipeIndex] || "";
                         
-                        // Check if this message is currently being streamed
-                        // It is streaming if we are loading AND it is the very last message in the entire history
                         const isStreamingMsg = isLoading && (globalIndex === history.length - 1);
 
                         return (
@@ -939,10 +885,9 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
                                     <TawaMessageRenderer 
                                         text={displayText}
                                         onUpdate={(newText) => handleMessageUpdate(globalIndex, newText)}
-                                        isStreaming={isStreamingMsg} // Pass prop
+                                        isStreaming={isStreamingMsg} 
                                     />
 
-                                    {/* Swipe Controls for AI Messages */}
                                     {isModel && !isStreamingMsg && (
                                         <div className="flex items-center gap-2 mt-1 select-none w-full border-t border-slate-800/50 pt-2">
                                             <div className="flex items-center bg-slate-800/50 rounded-lg p-0.5 border border-slate-700/50">
@@ -981,7 +926,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
                         );
                     })}
                     {isLoading && !history[history.length - 1]?.text && (
-                        /* Only show loader if we are NOT streaming (if streaming, text updates live) */
                         <div className="flex flex-col items-center justify-center p-6 space-y-3 animate-fade-in w-full border-t border-slate-800/30">
                             <Loader2 className="w-8 h-8 text-mystic-accent animate-spin" />
                             <span className="text-sm font-medium text-slate-400 animate-pulse">
@@ -992,9 +936,7 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
                     <div ref={chatEndRef} />
             </div>
 
-            {/* Input Area ... (Same as before) */}
             <div className="bg-mystic-900 border-t border-slate-800 z-20 shrink-0 flex flex-col shadow-[0_-5px_15px_rgba(0,0,0,0.2)]">
-                {/* ACTION CHOICES */}
                 <AnimatePresence>
                     {activeChoices.length > 0 && showActionChoices && !isLoading && (
                         <MotionDiv 
@@ -1023,9 +965,7 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
                     )}
                 </AnimatePresence>
 
-                {/* Input Bar */}
                 <div className="p-3 md:p-5 flex flex-col gap-2">
-                    {/* Toggle Button */}
                     {activeChoices.length > 0 && !isLoading && (
                         <div className="flex justify-center -mt-3 mb-1">
                              <button onClick={() => setShowActionChoices(!showActionChoices)} className="bg-slate-800 border border-slate-700 border-t-0 rounded-b-lg px-4 py-0.5 text-[10px] text-slate-400 hover:text-mystic-accent hover:bg-slate-700 transition-colors flex items-center gap-1 shadow-sm">
@@ -1047,9 +987,7 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
                             <Send size={20} />
                         </Button>
                     </div>
-                    {/* Pagination */}
                     <div className="flex justify-center">
-                        {/* ... Pagination code same as before ... */}
                         <div className="flex items-center gap-0.5 bg-slate-800/90 p-[2px] rounded-full border border-slate-700/50 backdrop-blur-sm shadow-sm scale-90 origin-bottom">
                             <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-slate-700 text-slate-400 disabled:opacity-20 transition-colors"><ChevronLeft size={10} /></button>
                             <span className="text-[9px] font-bold text-slate-500 px-2">{currentPage}/{totalPages}</span>
@@ -1060,12 +998,10 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
             </div>
         </div>
 
-        {/* SIDEBAR - DESKTOP */}
         <div className="hidden md:block w-80 shrink-0 h-full relative z-20 border-l border-slate-800">
             {renderSidebarContent()}
         </div>
 
-        {/* SIDEBAR - MOBILE OVERLAY */}
         <AnimatePresence>
             {showMobileSidebar && (
                 <>
@@ -1085,8 +1021,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
             )}
         </AnimatePresence>
 
-        {/* MODALS */}
-        {/* Character Modal (UPDATED WITH FULL INFO) */}
         <AnimatePresence>
             {showCharModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -1162,7 +1096,6 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
             )}
         </AnimatePresence>
         
-        {/* GLOBAL INFO (LSR) MODAL (UPDATED) */}
         <AnimatePresence>
             {showGlobalModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">

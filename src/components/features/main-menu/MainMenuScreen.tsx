@@ -12,7 +12,8 @@ import {
   FileText,
   Trash2,
   CheckCircle,
-  Download
+  Download,
+  History
 } from 'lucide-react';
 import Button from '../../ui/Button';
 import StatusFooter from './StatusFooter';
@@ -37,40 +38,75 @@ const itemVariants: any = {
   visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 50 } }
 };
 
+const VERSION_HISTORY = [
+  {
+    version: "v0.1.3",
+    date: "2024-05-22",
+    changes: [
+      "Sửa lỗi hiển thị văn bản (Wall of Text).",
+      "Cập nhật System Prompt để AI xuống dòng rõ ràng hơn giữa các đoạn văn và hội thoại.",
+      "Tối ưu CSS để hiển thị đúng các khoảng trắng và xuống dòng."
+    ]
+  },
+  {
+    version: "v0.1.2",
+    date: "2024-05-20",
+    changes: [
+      "Thêm trường 'Kịch bản khởi đầu' vào màn hình tạo thế giới.",
+      "Cải thiện logic khởi tạo game: AI sẽ ưu tiên hành động khởi đầu của người chơi.",
+      "Thêm mục 'Lịch sử cập nhật' vào Menu chính.",
+      "Tối ưu giao diện Tab trong phần Kiến tạo thế giới."
+    ]
+  },
+  {
+    version: "v0.1.1",
+    date: "2024-05-18",
+    changes: [
+      "Thêm tính năng Vector Search (RAG) để truy xuất ký ức quá khứ.",
+      "Cập nhật Tawa Protocol v2: Hệ thống Prompt linh hoạt hơn.",
+      "Sửa lỗi đồng bộ dữ liệu LSR trong Sidebar.",
+      "Cải thiện tốc độ phản hồi của AI model Flash."
+    ]
+  },
+  {
+    version: "v0.1.0 Alpha",
+    date: "2024-05-10",
+    changes: [
+      "Bản phát hành đầu tiên.",
+      "Hệ thống tạo thế giới và NPC bằng AI.",
+      "Cơ chế lưu/tải game bằng IndexedDB.",
+      "Tích hợp Gemini 3.0 Pro & Flash."
+    ]
+  }
+];
+
 const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, onImportSetup }) => {
   const { hasSaves } = useDatabaseStatus();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [saveList, setSaveList] = useState<SaveFile[]>([]);
   const [activeTab, setActiveTab] = useState<'auto' | 'manual'>('manual');
   
-  // Notification State
   const [notification, setNotification] = useState<NotificationState>({ show: false, message: '', type: 'info' });
-  
-  // Delete Confirmation State
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  
-  // Toast State (Auto Dismiss)
   const [toast, setToast] = useState<{show: boolean, message: string}>({show: false, message: ''});
 
   const MotionDiv = motion.div as any;
 
-  // Helper to show notification
   const showNotify = (message: string, type: NotificationType = 'info') => {
       setNotification({ show: true, message, type });
   };
 
-  // Toast Timer
   useEffect(() => {
     if (toast.show) {
         const timer = setTimeout(() => {
             setToast({ ...toast, show: false });
-        }, 3000); // 3 seconds
+        }, 3000); 
         return () => clearTimeout(timer);
     }
   }, [toast.show]);
 
-  // --- Import Logic ---
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -85,34 +121,24 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
         const content = e.target?.result as string;
         const parsedData = JSON.parse(content);
         
-        // CASE 1: File Save Gameplay (Standard WorldData structure with savedState)
-        // Đây là cấu trúc chuẩn khi tải về từ menu hoặc gameplay
         if (parsedData.savedState && parsedData.world && parsedData.player) {
-             console.log("Phát hiện file Save Gameplay (Standard)");
              if (onGameStart) {
                  onGameStart(parsedData as WorldData);
              }
              return;
         }
-
-        // CASE 2: Legacy/Alternative Structure (Structure flattened)
-        // Cấu trúc cũ hoặc biến thể: { id, world: WorldData, history: [], turnCount: 0, ... }
         else if (parsedData.history && parsedData.world && parsedData.world.player) {
-             console.log("Phát hiện file Save Gameplay (Legacy/Flattened)");
              const worldData: WorldData = {
-                ...parsedData.world, // Lấy WorldData gốc từ bên trong
+                ...parsedData.world,
                 savedState: {
                     history: parsedData.history,
                     turnCount: parsedData.turnCount || 0
                 }
             };
-            
             if (onGameStart) {
                 onGameStart(worldData);
             }
         }
-        // CASE 3: File Export từ World Creation (Chỉ là setup, không có savedState)
-        // Cấu trúc: { player, world, config, entities }
         else if (parsedData.player && parsedData.world && parsedData.config && !parsedData.savedState) {
              showNotify("⚠️ Đây là file Thiết lập Thế giới (Setup). Vui lòng vào mục 'Khởi tạo thế giới' -> Nút 'Nhập' (Import) ở góc dưới để sử dụng file này.", 'warning');
              return;
@@ -130,10 +156,8 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
     event.target.value = '';
   };
 
-  // --- Load Game Logic ---
   const handleOpenLoadGame = async () => {
       const saves = await dbService.getAllSaves();
-      // Sort by updated time desc
       saves.sort((a, b) => b.updatedAt - a.updatedAt);
       setSaveList(saves);
       setShowLoadModal(true);
@@ -141,16 +165,13 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
 
   const handleDeleteClick = (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
-      setDeleteTargetId(id); // Trigger confirmation modal
+      setDeleteTargetId(id); 
   };
 
   const handleDownloadClick = (e: React.MouseEvent, save: SaveFile) => {
       e.stopPropagation();
       try {
-          // Xuất toàn bộ dữ liệu WorldData (bao gồm savedState bên trong)
           const dataToExport = save.data; 
-          
-          // Tạo tên file an toàn
           const safeName = save.name.replace(/[^a-z0-9\u00C0-\u024F ]/gi, '_').toLowerCase();
           const fileName = `mythos_save_${safeName}_${save.id}.json`;
           
@@ -165,39 +186,27 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
           setToast({ show: true, message: "Đã tải xuống file save!" });
       } catch (err) {
           console.error(err);
-          showNotify("Lỗi khi tạo file tải xuống", 'error');
+          showNotify("Lỗi khi gọi AI.", 'error');
       }
   };
 
   const confirmDelete = async () => {
       if (!deleteTargetId) return;
-      
       await dbService.deleteSave(deleteTargetId);
-      
-      // Update UI List
       const newSaves = await dbService.getAllSaves();
       newSaves.sort((a, b) => b.updatedAt - a.updatedAt);
       setSaveList(newSaves);
-      
-      // Cleanup Modal
       setDeleteTargetId(null);
-      
-      // Show Toast instead of Popup
       setToast({ show: true, message: "Đã xóa file save thành công!" });
   };
 
   const handleLoadSave = (save: SaveFile) => {
       if (!onGameStart) return;
-
-      // save.data is fully compliant with WorldData structure including savedState
       const worldData = save.data as WorldData;
-      
-      // Safety check just in case savedState is missing in older saves (unlikely given new structure but safe)
       if (!worldData.savedState) {
           showNotify("File save bị hỏng: Thiếu trạng thái game.", 'error');
           return;
       }
-
       onGameStart(worldData);
   };
 
@@ -274,6 +283,17 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
               </Button>
             </MotionDiv>
 
+            <MotionDiv variants={itemVariants}>
+              <Button 
+                variant="ghost" 
+                className="w-full h-10 md:h-12 justify-start pl-6 md:pl-8" 
+                icon={<History size={18} />}
+                onClick={() => setShowHistoryModal(true)}
+              >
+                  Lịch sử cập nhật
+              </Button>
+            </MotionDiv>
+
             <div className="w-full h-[1px] bg-slate-800 my-1 md:my-2" />
 
             <MotionDiv variants={itemVariants}>
@@ -303,7 +323,6 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="bg-mystic-900 border border-slate-700 w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden"
                   >
-                      {/* Header */}
                       <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
                           <h2 className="text-xl font-bold text-slate-200 flex items-center gap-2">
                               <RotateCcw size={20} className="text-mystic-accent"/> Tải lại Game
@@ -313,7 +332,6 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
                           </button>
                       </div>
 
-                      {/* Tabs */}
                       <div className="flex border-b border-slate-800 bg-slate-900/30">
                           <button 
                             className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'manual' ? 'text-mystic-accent border-b-2 border-mystic-accent bg-mystic-accent/5' : 'text-slate-400 hover:text-slate-200'}`}
@@ -329,7 +347,6 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
                           </button>
                       </div>
 
-                      {/* List */}
                       <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar bg-mystic-900">
                           {filteredSaves.length === 0 ? (
                               <div className="text-center text-slate-500 py-10">
@@ -337,7 +354,6 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
                               </div>
                           ) : (
                               filteredSaves.map((save) => {
-                                  // Safely access nested data with fallbacks
                                   const turnCount = save.data?.savedState?.turnCount || 0;
                                   const playerName = save.data?.player?.name;
 
@@ -394,7 +410,53 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
           )}
       </AnimatePresence>
 
-      {/* Confirmation Modal for Deletion */}
+      {/* VERSION HISTORY MODAL */}
+      <AnimatePresence>
+        {showHistoryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+             <MotionDiv 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-mystic-900 border border-slate-700 w-full max-w-xl rounded-xl shadow-2xl flex flex-col max-h-[70vh] overflow-hidden"
+              >
+                <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                    <h2 className="text-xl font-bold text-slate-200 flex items-center gap-2">
+                        <History size={20} className="text-mystic-accent"/> Lịch sử cập nhật
+                    </h2>
+                    <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-white p-1">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                    {VERSION_HISTORY.map((v, idx) => (
+                      <div key={idx} className="relative pl-6 border-l border-slate-700">
+                          <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-mystic-accent shadow-[0_0_8px_#38bdf8]" />
+                          <div className="flex justify-between items-baseline mb-2">
+                              <h3 className="text-lg font-bold text-slate-100">{v.version}</h3>
+                              <span className="text-xs text-slate-500 font-mono">{v.date}</span>
+                          </div>
+                          <ul className="space-y-2">
+                              {v.changes.map((change, cIdx) => (
+                                <li key={cIdx} className="text-sm text-slate-400 flex gap-2">
+                                    <span className="text-mystic-accent">•</span>
+                                    {change}
+                                </li>
+                              ))}
+                          </ul>
+                      </div>
+                    ))}
+                </div>
+
+                <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex justify-end">
+                    <Button variant="ghost" onClick={() => setShowHistoryModal(false)}>Đóng</Button>
+                </div>
+             </MotionDiv>
+          </div>
+        )}
+      </AnimatePresence>
+
       <NotificationModal 
         isOpen={!!deleteTargetId}
         message="Bạn có chắc chắn muốn xóa file save này? Hành động này không thể hoàn tác."
@@ -405,7 +467,6 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
         cancelText="Giữ lại"
       />
 
-      {/* General Notification Modal (Errors/Info) */}
       <NotificationModal 
         isOpen={notification.show} 
         message={notification.message} 
@@ -413,7 +474,6 @@ const MainMenuScreen: React.FC<NavigationProps> = ({ onNavigate, onGameStart, on
         onClose={() => setNotification(prev => ({ ...prev, show: false }))} 
       />
 
-      {/* Success Toast Notification */}
       <AnimatePresence>
         {toast.show && (
             <motion.div 

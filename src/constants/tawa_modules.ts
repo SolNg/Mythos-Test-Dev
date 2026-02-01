@@ -1,3 +1,4 @@
+
 // src/constants/tawa_modules.ts
 import { TawaPresetConfig } from '../types';
 
@@ -424,7 +425,13 @@ Presentation, not representation.
 
 Show actions, dialogue, and facts. Do not tell emotions, interpretations, or meanings.
 
-Do not use metaphors. Do not use similes. Write what happens directly.`
+Do not use metaphors. Do not use similes. Write what happens directly.
+
+FORMATTING REQUIRED:
+- Paragraphs: Use double line breaks (\\n\\n) to separate paragraphs.
+- Structure: Avoid long, unbroken blocks of text. Break descriptions and actions into digestible chunks.
+- Dialogue: Ensure dialogues are on separate lines when the speaker changes or when transitioning from narration to speech.
+</Writing_Style>`
     },
     {
       id: 'style_light_novel',

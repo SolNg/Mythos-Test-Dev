@@ -87,6 +87,7 @@ export interface WorldSettingConfig {
   worldName: string;
   genre: string;
   context: string;
+  startingScenario?: string; // New field for initial action
 }
 
 export type NarrativePerspective = 'first' | 'second' | 'third';
