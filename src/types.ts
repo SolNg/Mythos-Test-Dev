@@ -110,6 +110,7 @@ export interface WorldData {
   savedState?: {
     history: ChatMessage[];
     turnCount: number;
+    lsrData?: Record<string, any[]>; // Persist LSR Database State
   };
 }
 

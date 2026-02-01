@@ -1234,6 +1234,52 @@ Yêu cầu:
 - Nghiêm cấm ghi lại nội dung tiểu kịch trường/lời phàn nàn; tổng số kiểm soát trong khoảng 3-5 mục; giữ thiện ý, từ chối thuyết âm mưu
 }}`
     },
+    {
+      id: 'out_state_update',
+      label: '📊 Cập nhật trạng thái (JSON)',
+      isActive: true,
+      position: 'bottom',
+      order: 305, 
+      content: `
+Sau khi viết xong nội dung chính, BẮT BUỘC phân tích và xuất ra khối cập nhật trạng thái dưới dạng JSON hợp lệ, được bao bọc bởi thẻ <state_update>.
+
+CRITICAL RULE:
+- KHÔNG sử dụng dấu gạch ngang ("-") hoặc để trống trường thông tin.
+- Nếu thông tin chưa biết/không rõ, ghi chính xác: "Chưa biết".
+- Nếu thông tin không áp dụng, ghi chính xác: "Không".
+- Chỉ cập nhật 'major_summary' khi có yêu cầu cụ thể từ hệ thống (Turn 20), nếu không hãy để null.
+
+<state_update>
+{
+  "character_info": [
+    { "Name": "...", "Gender": "...", "Age": "...", "Identity": "...", "Body_Features": "...", "Fashion_Style": "...", "Personality": "...", "Hobbies": "...", "Long_term_Goals": "...", "Relationships": "...", "Attitude_towards_User": "...", "Inter_character_Relations": "...", "Context_Role": "...", "Important_Notes": "..." }
+  ],
+  "sexual_info": [
+    { "Name": "...", "Sensitive_Body_Parts": "...", "First_Time": "...", "Sexual_Proficiency": "...", "Private_Parts_Details": "...", "Recent_Partners": "...", "Notes": "..." }
+  ],
+  "schedule_log": [
+    { "Summary": "...", "Overall_Content": "...", "Current_Progress": "...", "Performer": "...", "Delegator": "...", "Reward": "...", "Location": "...", "Start_Time": "...", "End_Limit_Time": "...", "Notes": "..." }
+  ],
+  "abilities": [
+    { "Ability_Name": "...", "Owner": "...", "Usage_Effect": "...", "Limitations": "...", "Notes": "..." }
+  ],
+  "inventory": [
+    { "Item_Name": "...", "Owner": "...", "Current_Location": "...", "Quantity": "...", "Form_Appearance": "...", "Usage": "...", "Limitations": "...", "Notes": "..." }
+  ],
+  "organizations": [
+    { "Org_Name": "...", "Known_Structure": "...", "Member_Traits": "...", "Purpose": "...", "Notes": "..." }
+  ],
+  "locations": [
+    { "Location_Name": "...", "Position_Coordinates": "...", "Spatial_Structure": "...", "Notes": "..." }
+  ],
+  "event_history": [
+    { "Time": "YYYY-MM-DD HH:mm", "Location": "...", "Event_Description": "..." }
+  ],
+  "major_summary": { "Time_Range": "...", "Content": "..." }
+}
+</state_update>
+`
+    },
     // --- TAWA 1.0 OUTPUT FORMAT ---
     {
       id: 'out_tawa_format',

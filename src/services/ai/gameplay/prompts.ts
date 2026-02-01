@@ -241,6 +241,21 @@ ${relevantMemories}
       source: 'GameStatus'
   });
 
+  // 5. Major Summary Trigger (Turn #20 Logic)
+  if (turnCount > 0 && turnCount % 20 === 0) {
+      segments.push({
+          priority: POSITION_PRIORITY['final'],
+          order: 9000,
+          content: `
+<IMPORTANT_SYSTEM_TRIGGER>
+This is turn #${turnCount}. 
+SYSTEM REQUEST: Please generate a 'Major Summary' of the last 20 turns for the 'major_summary' field (Table #8) in <state_update> JSON.
+Summarize key events, character development, and changes in the world state.
+</IMPORTANT_SYSTEM_TRIGGER>`,
+          source: 'MajorSummaryTrigger'
+      });
+  }
+
   // --- BƯỚC 4: THAY THẾ BIẾN (VARIABLE REPLACEMENT) ---
   
   const replaceVariables = (text: string, depth = 0): string => {

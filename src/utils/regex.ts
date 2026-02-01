@@ -12,6 +12,9 @@ export const TAWA_REGEX = {
   // Bắt nội dung trong thẻ <table_stored> - Strict
   TABLE_STORED: /(?<![("'`])<table_stored>([\s\S]*?)<\/table_stored>(?![)"'`])/i,
 
+  // Bắt nội dung trong thẻ <state_update> - Strict
+  STATE_UPDATE: /(?<![("'`])<state_update>([\s\S]*?)<\/state_update>(?![)"'`])/i,
+
   // Regex để xóa các đoạn kiểm tra tiến độ và bảng trạng thái rác
   ARTIFACTS_REMOVAL: [
     /\[(?:KIỂM TRA|CHECKING|TIẾN ĐỘ|PROGRESS|Hệ thống)[^\]]*\]/gi,
@@ -24,7 +27,8 @@ export const TAWA_REGEX = {
     /^enigma:[\s\S]*?(?=\n\n|$)/gim,
     /^echoes:[\s\S]*?(?=\n\n|$)/gim,
     /<word_count>[\s\S]*?<\/word_count>/gi,
-    /<details>[\s\S]*?<\/details>/gi // Aggressive details strip
+    /<details>[\s\S]*?<\/details>/gi,
+    /<state_update>[\s\S]*?<\/state_update>/gi // Hide JSON state updates
   ],
 
   // Regex xóa ký tự * 
@@ -61,7 +65,8 @@ export const cleanRawText = (text: string): string => {
     'memory_table_guide',
     'user_input',
     'word_count',
-    'details' // Remove <details> blocks often used for branches/logs
+    'details',
+    'state_update' // Remove JSON block
   ];
 
   tagsToRemove.forEach(tag => {

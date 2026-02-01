@@ -40,6 +40,25 @@ const itemVariants: any = {
 
 const VERSION_HISTORY = [
   {
+    version: "v0.1.5",
+    date: "2024-05-26",
+    changes: [
+      "Cập nhật cấu trúc LSR Database: Loại bỏ bảng thừa, tối ưu hóa hiển thị.",
+      "Cải thiện logic cập nhật trạng thái JSON: Strict Mode (Chống ký tự lạ).",
+      "Thêm tính năng 'Tổng kết lớn' (Major Summary) tự động mỗi 20 lượt."
+    ]
+  },
+  {
+    version: "v0.1.4",
+    date: "2024-05-24",
+    changes: [
+      "Sửa lỗi LSR Database không cập nhật.",
+      "Tích hợp hệ thống trích xuất trạng thái tự động (Auto-State Extraction).",
+      "AI tự động cập nhật thời gian, địa điểm, nhân vật và vật phẩm sau mỗi lượt.",
+      "Cải thiện độ chính xác của Inventory và Quest Log."
+    ]
+  },
+  {
     version: "v0.1.3",
     date: "2024-05-22",
     changes: [

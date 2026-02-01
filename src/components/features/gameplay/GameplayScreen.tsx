@@ -359,6 +359,12 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
               setHistory(worldDataWithState.savedState.history);
               setTurnCount(worldDataWithState.savedState.turnCount);
               
+              // Load persisted LSR Data if available
+              if (worldDataWithState.savedState.lsrData) {
+                  setLsrRuntimeData(worldDataWithState.savedState.lsrData);
+                  console.log("Loaded persisted LSR Data");
+              }
+
               setTimeout(() => {
                   vectorService.vectorizeAllHistory(worldDataWithState.savedState!.history);
               }, 1000);
@@ -392,6 +398,8 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
      setTurnCount(1);
   };
 
+  // Deprecated useEffect: logic moved to processAIResponse/Stream to support merging
+  /*
   useEffect(() => {
       if (history.length > 0) {
           const lastMsg = history[history.length - 1];
@@ -409,6 +417,7 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
           }
       }
   }, [history]);
+  */
 
   useEffect(() => {
     const totalPages = Math.ceil(history.length / MESSAGES_PER_PAGE) || 1;
@@ -583,6 +592,12 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
           });
       }
 
+      // Process State Update at end of stream
+      const stateUpdateContent = extractTagContent(accumulatedText, 'state_update');
+      if (stateUpdateContent) {
+          setLsrRuntimeData(prev => LsrParser.parseStateUpdateJson(stateUpdateContent, prev));
+      }
+
       setHistory(prev => {
            if (targetIndex === undefined || !prev[targetIndex]) return prev;
            const updated = [...prev];
@@ -605,6 +620,18 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
   };
 
   const processAIResponse = (responseText: string, initial = false) => {
+    // Process State Update
+    const stateUpdateContent = extractTagContent(responseText, 'state_update');
+    if (stateUpdateContent) {
+        setLsrRuntimeData(prev => LsrParser.parseStateUpdateJson(stateUpdateContent, prev));
+    } else {
+        // Fallback to legacy format if needed
+        const tableContent = extractTagContent(responseText, 'table_stored');
+        if (tableContent) {
+            setLsrRuntimeData(LsrParser.parseLsrString(tableContent));
+        }
+    }
+
     const branchesContent = extractTagContent(responseText, 'branches');
     const choicesList = branchesContent 
         ? branchesContent.split('\n').map(c => c.trim()).filter(c => c.length > 0) 
@@ -645,6 +672,12 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
             updated[index] = msg;
             return updated;
        });
+       
+       // Process state update for regenerated message
+       const stateUpdateContent = extractTagContent(newText, 'state_update');
+       if (stateUpdateContent) {
+           setLsrRuntimeData(prev => LsrParser.parseStateUpdateJson(stateUpdateContent, prev));
+       }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -718,6 +751,13 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
       
       if (direction === 'next' && currentIndex === total - 1) {
           handleRegenerate(msgIndex);
+      } else {
+          // Re-parse state when swiping
+          const currentText = msg.swipes?.[msg.swipeIndex || 0] || msg.text;
+          const stateUpdateContent = extractTagContent(currentText, 'state_update');
+          if (stateUpdateContent) {
+              setLsrRuntimeData(prev => LsrParser.parseStateUpdateJson(stateUpdateContent, prev));
+          }
       }
   };
 
@@ -729,7 +769,8 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
         ...activeWorld,
         savedState: {
             history: history,
-            turnCount: turnCount
+            turnCount: turnCount,
+            lsrData: lsrRuntimeData // Persist LSR Data
         },
         config: {
             ...activeWorld.config,
@@ -764,7 +805,8 @@ const GameplayScreen: React.FC<NavigationProps> = ({ onNavigate, activeWorld }) 
         ...activeWorld,
         savedState: {
             history: history,
-            turnCount: turnCount
+            turnCount: turnCount,
+            lsrData: lsrRuntimeData // Persist LSR Data
         },
         config: {
             ...activeWorld.config,
